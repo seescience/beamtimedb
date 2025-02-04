@@ -106,16 +106,6 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                  StrCol('text'),
                  Column('modify_time', DateTime, default=datetime.now))
 
-    users = Table('user', metadata,
-                  Column('id', Integer, primary_key=True),                  
-                  Column('badge', Integer),
-                  StrCol('first_name'),
-                  StrCol('last_name'),
-                  StrCol('email'),
-                  StrCol('orcid'),
-                  StrCol('affiliation'),
-                      )
-
     user_types = Table('user_type', metadata,
                        Column('id', Integer, primary_key=True),
                        Column('name', String(64)))
@@ -132,6 +122,19 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                        Column('id', Integer, primary_key=True),
                        Column('name', String(64)))                       
     
+    insts = Table('institution', metadata,
+                  Column('id', Integer, primary_key=True),
+                  Column('name', String(2048)),
+                  Column('city', String(512)),
+                  Column('country', String(512)) )
+
+    funding = Table('funding', metadata,
+                  Column('id', Integer, primary_key=True),
+                  Column('agency',      String(512)),
+                  Column('division',    String(512)),
+                  Column('grant_number', String(512)) )
+    
+
     runs = Table('run', metadata,
                  Column('id', Integer, primary_key=True),
                  Column('name', String(64)))                       
@@ -140,15 +143,25 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                  Column('id', Integer, primary_key=True),
                  Column('name', String(64)))                       
 
-
     technique = Table('technique', metadata,
                       Column('id', Integer, primary_key=True),
-                      Column('name', String(64)))                       
+                      Column('name', String(512)))
 
     acknow = Table('acknowledgment', metadata,
                       Column('id', Integer, primary_key=True),
                       StrCol('title'),
                       StrCol('text'))
+    
+
+    users = Table('user', metadata,
+                  Column('id', Integer, primary_key=True),                  
+                  Column('badge', Integer),
+                  StrCol('first_name'),
+                  StrCol('last_name'),
+                  StrCol('email'),
+                  Column('orcid', String(64)),
+                  Pointer('affiliation', other='institution'),
+                  PointerCol('user_level')  )
 
     
     proposals = Table('proposal', metadata,
@@ -163,13 +176,11 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                         PointerCol('esaf_type'),
                         PointerCol('esaf_status'),
                         PointerCol('beamline'),
-                        PointerCol('technique'),                        
                         PointerCol('proposal'),
                         PointerCol('spokesperson', other='user'),
                         PointerCol('beamline_contact', other='user'),
                         StrCol('title'),
-                        StrCol('description'),                                                
-                        Column('start_date', DateTime),
+                        StrCol('description'),                                                                   Column('start_date', DateTime),
                         Column('end_date', DateTime),
                         StrCol('user_folder'),
                         StrCol('data_doi'),
@@ -178,15 +189,24 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                         StrCol('proposal_pdf_file'),
                         )
     
-    experiment_users = Table('experiment_user', metadata,
-                             PointerCol('experiment'),
-                             PointerCol('user'),
-                             PointerCol('user_type'))
-    
-    experiment_acknows = Table('experiment_acknowledgment', metadata,
-                             PointerCol('experiment'),
-                             PointerCol('acknowledgment'))
-    
+    # join tables for many-to-one relations
+    expt_user = Table('experiment_user', metadata,
+                      PointerCol('experiment'),
+                      PointerCol('user'),
+                      PointerCol('user_type'))
+
+    expt_tech = Table('experiment_technique', metadata,
+                      PointerCol('experiment'),
+                      PointerCol('technique'))
+
+    expt_fund = Table('experiment_funding', metadata,
+                      PointerCol('experiment'),
+                      PointerCol('funding'))
+
+    expt_acknows = Table('experiment_acknowledgment', metadata,
+                         PointerCol('experiment'),
+                         PointerCol('acknowledgment'))
+
     metadata.create_all(bind=engine)
     time.sleep(0.1)
 
