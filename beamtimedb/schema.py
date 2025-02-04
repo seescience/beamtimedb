@@ -160,7 +160,7 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                   StrCol('last_name'),
                   StrCol('email'),
                   Column('orcid', String(64)),
-                  Pointer('affiliation', other='institution'),
+                  PointerCol('affiliation', other='institution'),
                   PointerCol('user_level')  )
 
     
