@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """
+
 SQLAlchemy wrapping of beamtim database
 
 Main Class for full Database:  BeamtimeDB
@@ -20,7 +21,6 @@ import epics
 
 from .schema import create_beamtimedb
 from .simpledb import SimpleDB, isotime
-
 
 def get_credentials(envvar='BEAMTIMEDB_CREDENTIALS'):
     """look up credentials file from environment variable"""
@@ -137,9 +137,38 @@ class BeamtimeDB(SimpleDB):
               'email': email, 'badge': badge}
         if orcid is not None:
             kws['orcid'] = orcid
+        if affiliation is not None:
+            inst = self.add_affiliation(affiliation, warn=False)
+            kws['affiliation'] = inst.id
         cur = self.get_user(**kws)
         if cur is not None:
             raise ValueError("user exists")
         
         self.add_row('user', **kws)
+
+
+    def get_institution(self, name, city=None, country=None):
+        where = {'name': name}
+        if city is not None:
+            where['city'] = city
+        if country is not None:
+            where['country'] = country
+
+        return self.get_row('institution', where=where,
+                            none_if_empty=True)
+
+    def add_institution(self, name, city=None, country=None, warn=False):
+        cur = self.get_instittuion(name, city=city, country=country)
+        if warn and cur is not None:
+            print(f"Warning: institution '{name}' exists")
+        if cur is None:
+            kws = {'name': name}                          
+            if city is not None:
+                kws['city'] = city
+            if country is not None:
+                kws['country'] = country
+
+            self.add_row('institution', **kws)
+            cur = self.get_instittuion(name, city=city, country=country)
+        return cur
 
