@@ -153,7 +153,7 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                       StrCol('text'))
     
 
-    users = Table('user', metadata,
+    users = Table('person', metadata,
                   Column('id', Integer, primary_key=True),                  
                   Column('badge', Integer),
                   StrCol('first_name'),
@@ -167,7 +167,7 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
     proposals = Table('proposal', metadata,
                       Column('id', Integer, primary_key=True),
                       StrCol('title'),
-                      PointerCol('spokesperson', other='user'))
+                      PointerCol('spokesperson', other='person'))
     
     experiments = Table('experiment', metadata,
                         Column('id', Integer, primary_key=True),
@@ -177,10 +177,11 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                         PointerCol('esaf_status'),
                         PointerCol('beamline'),
                         PointerCol('proposal'),
-                        PointerCol('spokesperson', other='user'),
-                        PointerCol('beamline_contact', other='user'),
+                        PointerCol('spokesperson', other='person'),
+                        PointerCol('beamline_contact', other='person'),
                         StrCol('title'),
-                        StrCol('description'),                                                                   Column('start_date', DateTime),
+                        StrCol('description'),
+                        Column('start_date', DateTime),
                         Column('end_date', DateTime),
                         StrCol('user_folder'),
                         StrCol('data_doi'),
@@ -190,9 +191,9 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                         )
     
     # join tables for many-to-one relations
-    expt_user = Table('experiment_user', metadata,
+    expt_user = Table('experiment_person', metadata,
                       PointerCol('experiment'),
-                      PointerCol('user'),
+                      PointerCol('person'),
                       PointerCol('user_type'))
 
     expt_tech = Table('experiment_technique', metadata,
@@ -222,7 +223,7 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
         for val in values:
             db.insert(table, name=val)
 
-    for key, value in (("version", "1.0"),):
+    for key, value in (("version", "1.1"),):
         db.set_info(key, value)
 
     print(f"Created database for beamlinedb: '{dbname}'")
