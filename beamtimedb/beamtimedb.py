@@ -128,23 +128,21 @@ class BeamtimeDB(SimpleDB):
             where['orcid'] = orcid
         if affiliation is not None:
             where['affiliation'] = affiliation
-        return self.get_rows('user', where=where, none_if_empty=True)
+        return self.get_rows('person', where=where, none_if_empty=True)
     
     def add_user(self, first_name, last_name, email, badge,
-                 orcid=None, affliation=None, level=None):
+                 orcid=None, affiliation=None, level=None):
         """add user"""
         kws ={'first_name': first_name, 'last_name': last_name,
               'email': email, 'badge': badge}
         if orcid is not None:
             kws['orcid'] = orcid
-        if affiliation is not None:
-            inst = self.add_affiliation(affiliation, warn=False)
-            kws['affiliation'] = inst.id
-        cur = self.get_user(**kws)
-        if cur is not None:
-            raise ValueError("user exists")
+        #if affiliation is not None:
+        #    inst = self.add_affiliation(affiliation, warn=False)
+        #    kws['affiliation'] = inst.id
         
-        self.add_row('user', **kws)
+        cur = self.get_user(**kws)
+        self.add_row('person', **kws)
 
 
     def get_institution(self, name, city=None, country=None):
