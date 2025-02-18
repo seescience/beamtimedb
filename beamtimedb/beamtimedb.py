@@ -140,10 +140,11 @@ class BeamtimeDB(SimpleDB):
         #if affiliation is not None:
         #    inst = self.add_affiliation(affiliation, warn=False)
         #    kws['affiliation'] = inst.id
-        
         cur = self.get_user(**kws)
-        self.add_row('person', **kws)
-
+        if cur is None:
+            self.add_row('person', **kws)
+            cur = self.get_user(**kws)
+        return cur
 
     def get_institution(self, name, city=None, country=None):
         where = {'name': name}
@@ -167,6 +168,66 @@ class BeamtimeDB(SimpleDB):
                 kws['country'] = country
 
             self.add_row('institution', **kws)
-            cur = self.get_instittuion(name, city=city, country=country)
+            cur = self.get_instituion(name, city=city, country=country)
         return cur
 
+   
+    def _getid(self, table, value, key='name'):
+        """ generic  get-id-by-name"""
+        kws = {key: value}
+        row = self.get_row(table, where=kws)
+        if row is None:
+            self.add_row(table, **kws)
+            row = self.get_row(table, where=kws)
+        if row is None:
+            raise ValueError(f"could not get or add {table} {key}={value}")
+        return row.id
+
+   
+    def get_proposal(self, prop_id):
+        return self.get_row('proposal',where={'id': prop_id}, none_if_empty=True)
+
+    def add_proposal(self, prop_id, title=None, spokesperson=None):
+        print("Add Proposal " , prop_id, title, spokesperson)
+        prop = self.get_proposal(prop_id)
+        if prop is not None:
+            raise ValueError(f"proposal {prop_id} exists")
+        print("add proposal....")
+
+    def get_experiment(self, esaf_id):
+        return self.get_rows('experiment',where={'id': esaf_id}, none_if_empty=True)
+        
+    def add_experiment(self, esaf_id, run='2025-1',
+                       esaf_status='Pending', esaf_type='GUP',
+                       beamline=None, proposal=None,
+                       spokesperson=None, beamline_contact=None,
+                       users=None, title=None, description=None,
+                       start_date=None, end_date=None,
+                       user_folder=None, data_doi=None,
+                       pvlog_template_file=None, esaf_pdf_file=None,
+                       proposal_pdf_file=None):
+        
+        esaf = self.get_experiment(esaf_id)
+        if esaf is not None:
+            raise ValueError(f"experiment {esaf_id} exists")
+        print("add experiment....")
+        sperson = self.get_user(id=spokesperson)
+
+        kws ={'id': esaf_id,
+              'run_id': self._getid('run', run),
+              'esaf_type_id':  self._getid('esaf_type', esaf_type),
+              'esaf_status_id':  self._getid('esaf_status', esaf_status),
+              'esaf_type_id':  self._getid('esaf_type', esaf_type),
+              'spokesperson_id': spokesperson,
+              'beamline_id':  self._getid('beamline', beamline),
+              'title': title,
+              'description': description,
+              'start_date': start_date,
+              'end_date': end_date,
+              }
+        
+        self.add_row('experiment', **kws)
+        exp_id = self.get_experiment(esaf_id)[0].id
+        for uid in users:
+            self.add_row('experiment_person', experiment_id=exp_id,
+                         person_id=uid)
