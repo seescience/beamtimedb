@@ -323,7 +323,12 @@ class SimpleDB(object):
         if result is not None and len(result) == 0 and none_if_empty:
             result = None
         return result
+    
+    def get_row(self, tablename, where=None):
+        """get a single row or None if empty"""
+        return self.get_rows(tablename, where=where, limit_one=True, none_if_empty=True)
 
+    
     def lookup(self, tablename, **kws):
         """
         simple select of table with any equality filter on columns by name
