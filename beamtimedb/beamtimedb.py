@@ -106,10 +106,10 @@ class BeamtimeDB(SimpleDB):
         """get messages"""
         return self.getrows('messages', order_by=order_by)
 
-    def get_user(self, id=None, badge=None, last_name=None,
+    def get_users(self, id=None, badge=None, last_name=None,
                  first_name=None, email=None, orcid=None,
                  affiliation=None):
-        """get list of users matching keyword arguments,
+        """get list users matching keyword arguments,
         or None"""
         where = {}
         if id is not None:
@@ -120,8 +120,6 @@ class BeamtimeDB(SimpleDB):
             where['last_name'] = last_name
         if first_name is not None:
             where['first_name'] = first_name
-        if last_name is not None:
-            where['last_name'] = last_name
         if email is not None:
             where['email'] = email
         if orcid is not None:
@@ -129,6 +127,22 @@ class BeamtimeDB(SimpleDB):
         if affiliation is not None:
             where['affiliation'] = affiliation
         return self.get_rows('person', where=where, none_if_empty=True)
+    
+    def get_user(self, id=None, badge=None, email=None, orcid=None):
+        """get user (one only) matching id, badge, email, or orcid, 
+        or return None if not found
+        """
+        where = {}
+        if id is not None:
+            where['id'] = id
+        if badge is not None:
+            where['badge'] = badge
+        if email is not None:
+            where['email'] = email
+        if orcid is not None:
+            where['orcid'] = orcid
+        return self.get_row('person', where=where)
+
     
     def add_user(self, first_name, last_name, email, badge,
                  orcid=None, affiliation=None, level=None):
@@ -140,10 +154,10 @@ class BeamtimeDB(SimpleDB):
         #if affiliation is not None:
         #    inst = self.add_affiliation(affiliation, warn=False)
         #    kws['affiliation'] = inst.id
-        cur = self.get_user(**kws)
+        cur = self.get_user(badge=badge)
         if cur is None:
             self.add_row('person', **kws)
-            cur = self.get_user(**kws)
+            cur = self.get_user(badge=badge)
         return cur
 
     def get_institution(self, name, city=None, country=None):
@@ -153,11 +167,10 @@ class BeamtimeDB(SimpleDB):
         if country is not None:
             where['country'] = country
 
-        return self.get_row('institution', where=where,
-                            none_if_empty=True)
+        return self.get_row('institution', where=where)
 
     def add_institution(self, name, city=None, country=None, warn=False):
-        cur = self.get_instittuion(name, city=city, country=country)
+        cur = self.get_institution(name, city=city, country=country)
         if warn and cur is not None:
             print(f"Warning: institution '{name}' exists")
         if cur is None:
@@ -168,7 +181,7 @@ class BeamtimeDB(SimpleDB):
                 kws['country'] = country
 
             self.add_row('institution', **kws)
-            cur = self.get_instituion(name, city=city, country=country)
+            cur = self.get_institution(name, city=city, country=country)
         return cur
 
    
@@ -185,17 +198,32 @@ class BeamtimeDB(SimpleDB):
 
    
     def get_proposal(self, prop_id):
-        return self.get_row('proposal',where={'id': prop_id}, none_if_empty=True)
+        """
+        get proposal by ID, if it exists, otherwise returns None
+        """
+        return self.get_row('proposal',where={'id': prop_id})
 
-    def add_proposal(self, prop_id, title=None, spokesperson=None):
-        print("Add Proposal " , prop_id, title, spokesperson)
+    def add_proposal(self, prop_id, title=None, spokesperson_id=None):
+        print("Add Proposal " , prop_id, title, spokesperson_id)
         prop = self.get_proposal(prop_id)
-        if prop is not None:
-            raise ValueError(f"proposal {prop_id} exists")
-        print("add proposal....")
+        if prop is None:
+            print("add proposal....")
+            kws = {'id': prop_id}
+            if title is not None:
+                kws['title'] = title
+            if spokesperson_id is not None:
+                kws['spokesperson_id'] = spokesperson_id
+                
+            self.add_row('proposal', **kws)
+            prop = self.get_proposal(prop_id)
+        return prop
+
 
     def get_experiment(self, esaf_id):
-        return self.get_rows('experiment',where={'id': esaf_id}, none_if_empty=True)
+        """
+        get experiment by ID (ESAF Number), if it exists, otherwise returns None
+        """        
+        return self.get_row('experiment', where={'id': esaf_id})
         
     def add_experiment(self, esaf_id, run='2025-1',
                        esaf_status='Pending', esaf_type='GUP',
