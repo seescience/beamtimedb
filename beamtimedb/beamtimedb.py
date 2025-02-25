@@ -255,7 +255,7 @@ class BeamtimeDB(SimpleDB):
               }
         
         self.add_row('experiment', **kws)
-        exp_id = self.get_experiment(esaf_id)[0].id
+        exp_id = self.get_experiment(esaf_id).id
         for uid in users:
             self.add_row('experiment_person', experiment_id=exp_id,
                          person_id=uid)
