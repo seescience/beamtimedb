@@ -22,6 +22,10 @@ import epics
 from .schema import create_beamtimedb
 from .simpledb import SimpleDB, isotime
 
+
+BEAMLINE_ALIASES =  {'13idd': '13idcd',
+                     '13idc': '13idcd'}
+
 def get_credentials(envvar='BEAMTIMEDB_CREDENTIALS'):
     """look up credentials file from environment variable"""
     conn = {}
@@ -82,6 +86,14 @@ class BeamtimeDB(SimpleDB):
         if create:
             create_beamtimedb(dbname, server=self.server, create=True, **kws)
         SimpleDB.__init__(self, dbname=self.dbname, server=self.server, **kws)
+
+        self.beamline_names = {}
+        for row in self.get_rows('beamline'):
+            if row.name is not None:
+                name = row.name.lower().replace('-', '').replace(',', '')
+                self.beamline_names[name] = row.id
+        for key, val in BEAMLINE_ALIASES.items():
+            self.beamline_names[key] = self.beamline_names.get(val, None)
 
     def create_newdb(self, dbname, connect=False, **kws):
         "create a new, empty database"
@@ -259,3 +271,16 @@ class BeamtimeDB(SimpleDB):
         for uid in users:
             self.add_row('experiment_person', experiment_id=exp_id,
                          person_id=uid)
+
+    def match_beamline(self, blname):
+        "match beamline name to beamline row, allowing name variations"
+        xname = blname.lower().replace('-', '').replace(',', '')
+        bid = self.beamline_names.get(xname, None)
+        if bid is None: 
+            for key, xbid in self.beamline_names.items():
+                if key.startswith(xname):
+                    bid = xbid
+        if bid is None:
+            bid = self.beamline_names.get('unknown', None)
+        return bid
+
