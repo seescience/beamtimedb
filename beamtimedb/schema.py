@@ -34,6 +34,8 @@ USER_LEVEL = ('Faculty/professional staff', 'Graduate student', 'Other',
 
 BEAMLINES = ('13-BM-C', '13-BM-D', '13-ID-C,D', '13-ID-E', '6-BM-A,B', '3-ID-B,C,D')
 
+FOLDER_STATUS = ('unknown', 'requested', 'pending', 'created', 'cancelled', 'deleted')
+
 def hasdb(dbname, create=False, server='postgresql',
              user='', password='', host='', port=5432):
     """
@@ -121,6 +123,10 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
     esaf_status = Table('esaf_status', metadata,
                        Column('id', Integer, primary_key=True),
                        Column('name', String(64)))                       
+
+    folder_status = Table('esaf_status', metadata,
+                       Column('id', Integer, primary_key=True),
+                       Column('name', String(64)))                       
     
     insts = Table('institution', metadata,
                   Column('id', Integer, primary_key=True),
@@ -145,7 +151,12 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
 
     technique = Table('technique', metadata,
                       Column('id', Integer, primary_key=True),
-                      Column('name', String(512)))
+                      Column('name', String(512)),
+                      Column('user_name', String(64)),
+                      Column('base_dir', String(512)),                      
+                      Column('pvlog_template', text),
+                      PointerColumn('beamline'),
+                      )
 
     acknow = Table('acknowledgment', metadata,
                       Column('id', Integer, primary_key=True),
@@ -168,24 +179,34 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                       Column('id', Integer, primary_key=True),
                       StrCol('title'),
                       PointerCol('spokesperson', other='person'))
-    
+
+    pvlog_template = Table('pvlog_template', metadata,
+                      Column('id', Integer, primary_key=True),
+                      PointerCol('beamline'),
+                      StrCol('name'),
+                      StrCol('value'))
+
+
     experiments = Table('experiment', metadata,
                         Column('id', Integer, primary_key=True),
                         Column('time_request', Integer),                        
                         PointerCol('run'),
                         PointerCol('esaf_type'),
                         PointerCol('esaf_status'),
+                        PointerCol('folder_status'),
+                        PointerCol('technique'),
                         PointerCol('beamline'),
                         PointerCol('proposal'),
                         PointerCol('spokesperson', other='person'),
                         PointerCol('beamline_contact', other='person'),
+                        PointerCol('pvlog_template')
                         StrCol('title'),
                         StrCol('description'),
                         Column('start_date', DateTime),
                         Column('end_date', DateTime),
+                        Column('folder_create_time', DateTime),
                         StrCol('user_folder'),
                         StrCol('data_doi'),
-                        StrCol('pvlog_template_file'),
                         StrCol('esaf_pdf_file'),
                         StrCol('proposal_pdf_file'),
                         )
@@ -215,6 +236,7 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
     
     # add some initial data:
     for table, values in (('esaf_status', ESAF_STATUS),
+                          ('folder_status', FOLDER_STATUS),
                           ('esaf_type', ESAF_TYPES),
                           ('user_type', USER_TYPES),
                           ('user_level', USER_LEVEL),
@@ -223,7 +245,9 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
         for val in values:
             db.insert(table, name=val)
 
-    for key, value in (("version", "1.1"),):
+    for key, value in (("version", "1.1"),
+                       ("version", "1.2"),                       
+                       ):
         db.set_info(key, value)
 
     print(f"Created database for beamlinedb: '{dbname}'")
