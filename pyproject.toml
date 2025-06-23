@@ -11,6 +11,7 @@ dependencies = [
     "sqlalchemy>=2.0",
     "sqlalchemy_utils",
     "psycopg2",
+    "pypdf",
 ]
 
 requires-python = ">= 3.10"
