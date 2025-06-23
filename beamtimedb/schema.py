@@ -36,6 +36,8 @@ BEAMLINES = ('13-BM-C', '13-BM-D', '13-ID-C,D', '13-ID-E', '6-BM-A,B', '3-ID-B,C
 
 FOLDER_STATUS = ('unknown', 'requested', 'pending', 'created', 'cancelled', 'deleted')
 
+PROCESS_STATUS = ('new', 'processed', 'modified', 'completed', 'locked')
+
 def hasdb(dbname, create=False, server='postgresql',
              user='', password='', host='', port=5432):
     """
@@ -186,6 +188,15 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                       StrCol('name'),
                       StrCol('value'))
 
+    queue = Table('queue', metadata,
+                      Column('id', Integer, primary_key=True),
+                      Column('experiment_number', Integer),
+                      Column('proposal_number', Integer),
+                      StrCol('title'),
+                      StrCol('acknowledgements'),
+                      StrCol('data_path'),
+                      StrCol('pvlog_path'),
+                      Column('doi', Integer))
 
     experiments = Table('experiment', metadata,
                         Column('id', Integer, primary_key=True),
@@ -194,12 +205,12 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                         PointerCol('esaf_type'),
                         PointerCol('esaf_status'),
                         PointerCol('folder_status'),
+                        PointerCol('process_status'),
                         PointerCol('technique'),
                         PointerCol('beamline'),
                         PointerCol('proposal'),
                         PointerCol('spokesperson', other='person'),
                         PointerCol('beamline_contact', other='person'),
-                        PointerCol('pvlog_template')
                         StrCol('title'),
                         StrCol('description'),
                         Column('start_date', DateTime),
@@ -209,6 +220,10 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                         StrCol('data_doi'),
                         StrCol('esaf_pdf_file'),
                         StrCol('proposal_pdf_file'),
+                        Column('needs_doi', Integer),
+                        Column('needs_folder', Integer),
+                        Column('needs_pvlog', Integer),
+                        StrCol('pvlog_file'),
                         )
     
     # join tables for many-to-one relations
@@ -237,6 +252,7 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
     # add some initial data:
     for table, values in (('esaf_status', ESAF_STATUS),
                           ('folder_status', FOLDER_STATUS),
+                          ('process_status', PROCESS_STATUS),
                           ('esaf_type', ESAF_TYPES),
                           ('user_type', USER_TYPES),
                           ('user_level', USER_LEVEL),
