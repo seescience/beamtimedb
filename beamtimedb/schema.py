@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 
 from sqlalchemy import (MetaData, create_engine, text, Table, Column,
-                        ForeignKey, Integer, String, Text, DateTime)
+                        ForeignKey, Integer, Boolean, String, Text, DateTime)
 
 from sqlalchemy_utils import database_exists, create_database
 
@@ -220,9 +220,9 @@ def create_beamtimedb(dbname, server='postgresql', create=True,
                         StrCol('data_doi'),
                         StrCol('esaf_pdf_file'),
                         StrCol('proposal_pdf_file'),
-                        Column('needs_doi', Integer),
-                        Column('needs_folder', Integer),
-                        Column('needs_pvlog', Integer),
+                        Column('needs_doi', Boolean, default=True),
+                        Column('needs_folder', Boolean, default=True),
+                        Column('needs_pvlog', Boolean, default=True),
                         StrCol('pvlog_file'),
                         )
     
