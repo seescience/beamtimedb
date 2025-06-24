@@ -8,7 +8,7 @@ except ImportError:
     warn('need to import APSBSS Server to read APS BSS data')
 
 
-beamlines = {'13': {'13IDE:bss:': '13-ID-E',
+BEAMLINES = {'13': {'13IDE:bss:': '13-ID-E',
                     '13IDCD:bss:': '13-ID-C,D',
                     '13BMD:bss:': '13-BM-D',
                     '13BMC:bss:': '13-BM-C'}
@@ -21,18 +21,18 @@ def filldb_from_apsbss(sector='13'):
     bt_db = BeamtimeDB()
     
     dm_url = bt_db.get_info('DM_APS_DB_WEB_SERVICE_URL')
-    os.environ['DM_APS_DB_WEB_SERVICE_URL', dm_url)
+    os.environ['DM_APS_DB_WEB_SERVICE_URL'] = dm_url
     try:
         bss_server = BSS_Server()
     except:
         raise ValueError(f'cannot connect to APSBSS Server with {dm_url=}')
 
     current_esafs = bss_server.current_esafs(sector)
-    current_props = bss_server.current_proposals(sector)
 
     esaf_folder_root = bt_db.get_info('esaf_pdf_folder')
 
     for esaf in current_esafs:
+        print('esaf ', esaf.esaf_id, esaf.title)
         user_ids = []
         spokesperson = None
         for user in esaf._users:
@@ -53,7 +53,8 @@ def filldb_from_apsbss(sector='13'):
         
     # proposals
     for prefix, beamline in beamlines.items():
-        for propid, prop in current_proposals.items():
+        for propid, prop in bss_server.current_proposals(beamline).items():
+            print(f'proosal {prefix=}, {beamline=}, {propid=}') 
             spokesperson = None
             for user in prop.to_dict()['experimenters']:
                 badge = int(user['badge'])
