@@ -32,7 +32,7 @@ def filldb_from_apsbss(sector='13'):
     esaf_folder_root = bt_db.get_info('esaf_pdf_folder')
 
     for esaf in current_esafs:
-        print('esaf ', esaf.esaf_id, esaf.title)
+        # print('esaf ', esaf.esaf_id, esaf.title)
         user_ids = []
         spokesperson = None
         for user in esaf._users:
@@ -54,7 +54,7 @@ def filldb_from_apsbss(sector='13'):
     # proposals
     for prefix, beamline in beamlines.items():
         for propid, prop in bss_server.current_proposals(beamline).items():
-            print(f'proosal {prefix=}, {beamline=}, {propid=}') 
+            # print(f'proosal {prefix=}, {beamline=}, {propid=}') 
             spokesperson = None
             for user in prop.to_dict()['experimenters']:
                 badge = int(user['badge'])
