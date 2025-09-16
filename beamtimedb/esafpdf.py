@@ -12,6 +12,7 @@ def read_esaf_header(filename):
     """return dictionary of data from the top of the 
     first page of an ESAF PDF
     """
+    print(f" READ PDF HEADER {filename=}")
     pdf_reader = PdfReader(open(filename, mode='rb'))
     page1_text = pdf_reader.pages[0].extract_text()
    
@@ -66,7 +67,7 @@ def get_beamline_names():
     global BLNAMES
     beamdb = BeamtimeDB()
     BLNAMES = {}
-    for row in beamdb.get_rows('beamline'):
+    for row in beamdb.get_rows('apsbss_beamline'):
         if row.name is not None:
             name = row.name.lower().replace('-', '').replace(',', '')
             BLNAMES[name] = row.id
@@ -90,15 +91,26 @@ def match_beamline(blname):
         bid = BLNAMES.get('unknown', None)
     return bid
 
-def read_esaf_pdfs():
+def read_esaf_pdfs(run=None):
     beamdb = get_beamline_names()
     esaf_folder = beamdb.get_info('esaf_pdf_folder')
-    run_id = beamdb.get_info('current_run_id')
-    run_name = beamdb.get_rows('run', where={'id': int(run_id)}, limit_one=True, none_if_empty=True)
-    run_name = run_name.name
+    if run is None:
+        run_id = beamdb.get_info('current_run_id')
+        run_name = beamdb.get_rows('run', where={'id': int(run_id)},
+                                   limit_one=True, none_if_empty=True)
+        run_name = run_name.name
+    else:
+        run_name = run
+        run = beamdb.get_rows('run', where={'name': run},
+                                   limit_one=True, none_if_empty=True)
+        run_id = run.id
+        
     for bname in ('BMC', 'BMD',  'ID CD', 'IDE'):
         folder = Path(esaf_folder, run_name, bname)
         for pdffile in glob(folder.as_posix() + '/*'):
+            if not pdffile.endswith('.pdf'):
+                continue
+                
             data = read_esaf_header(pdffile)
             # print("READ PDF ", pdffile, '\n', data)
             if data['beamline'] is None:

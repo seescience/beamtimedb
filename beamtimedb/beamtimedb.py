@@ -88,7 +88,7 @@ class BeamtimeDB(SimpleDB):
         SimpleDB.__init__(self, dbname=self.dbname, server=self.server, **kws)
 
         self.beamline_names = {}
-        for row in self.get_rows('beamline'):
+        for row in self.get_rows('apsbss_beamline'):
             if row.name is not None:
                 name = row.name.lower().replace('-', '').replace(',', '')
                 self.beamline_names[name] = row.id
@@ -259,7 +259,7 @@ class BeamtimeDB(SimpleDB):
               'esaf_status_id':  self._getid('esaf_status', esaf_status),
               'esaf_type_id':  self._getid('esaf_type', esaf_type),
               'spokesperson_id': spokesperson,
-              'beamline_id':  self._getid('beamline', beamline),
+              'beamline_id':  self._getid('apsbss_beamline', beamline),
               'title': title,
               'description': description,
               'start_date': start_date,

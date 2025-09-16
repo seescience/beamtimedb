@@ -22,8 +22,7 @@ BEAMLINES = {'13': {'13IDE:bss:': '13-ID-E',
                     '13BMC:bss:': '13-BM-C'}
              }
 
-
-def filldb_from_apsbss(sector='13'):
+def filldb_from_apsbss(sector='13', run=None):
     beamlines = BEAMLINES[sector]
 
     bt_db = BeamtimeDB()
@@ -35,9 +34,10 @@ def filldb_from_apsbss(sector='13'):
     except:
         raise ValueError(f'cannot connect to APSBSS Server with {dm_url=}')
 
-    current_esafs = bss_server.current_esafs(sector)
-
-    esaf_folder_root = bt_db.get_info('esaf_pdf_folder')
+    if run is None:
+        run = bss_server.current_run
+    
+    current_esafs = bss_server.esafs(sector, run=run)
 
     for esaf in current_esafs:
         # print('esaf ', esaf.esaf_id, esaf.title)
