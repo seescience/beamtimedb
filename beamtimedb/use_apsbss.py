@@ -58,7 +58,6 @@ def filldb_from_apsbss(sector='13', run=None):
                                  title=esaf.title, description=esaf.description,
                                  spokesperson=spokesperson, users=user_ids)
 
-        
     # proposals
     for prefix, beamline in beamlines.items():
         for propid, prop in bss_server.current_proposals(beamline).items():
@@ -118,30 +117,33 @@ def update_pvs(sector='13'):
         caput(f"{prefix}esaf:cycle", cycle)
 
     current_time = datetime.now().astimezone(tzone)
-    
+    curr_props = {}
     prop_badges = {}
     for prefix, name in beamlines.items():
         props = bss_server.current_proposals(name)
-        print(f"{prefix} {name} {len(props):d} proposals for this cycle")
+        # print(f"{prefix} {name} {len(props):d} proposals for this cycle")
         current_prop = None
         for propid, prop in props.items():
             start_time = prop.startDate.astimezone(tzone)
             end_time = prop.endDate.astimezone(tzone)
             if start_time < current_time and current_time < end_time:
                 current_prop = propid
-                print(f" Current : {propid=}   {prefix=}, {name=}")
+                # print(f" Current : {propid=}   {prefix=}, {name=}")
         if current_prop is None:
             current_prop = propid                
         prop = props[current_prop]
-
+        start_date = prop.startDate.isoformat(sep=' ', timespec='seconds')
+        end_date = prop.endDate.isoformat(sep=' ', timespec='seconds')        
+        curr_props[prefix] = [prop.lastNames, prop.startDate, prop.endDate]
         caput(f"{prefix}proposal:id", str(current_prop))
-        caput(f"{prefix}proposal:startDate", prop.startDate.isoformat(sep=' ', timespec='seconds'))
-        caput(f"{prefix}proposal:endDate", prop.endDate.isoformat(sep=' ', timespec='seconds'))
+        caput(f"{prefix}proposal:startDate", start_date)
+        caput(f"{prefix}proposal:endDate", end_date)
         caput(f"{prefix}proposal:title", prop.title)
         caput(f"{prefix}proposal:userBadges", ', '.join(prop.badges))
         caput(f"{prefix}proposal:users", ', '.join(prop.lastNames))
         
-
+    # print("Look for ESAFS " , sector)
+    # print("Current Proposals ", curr_props)
     for esaf in bss_server.current_esafs(sector):
         start_time = esaf.startDate.astimezone(tzone)
         end_time = esaf.endDate.astimezone(tzone)
@@ -149,7 +151,14 @@ def update_pvs(sector='13'):
             end_time-start_time < timedelta(days=50)):
             esaf_badges = [u.badge for u in esaf._users]
             esaf_lnames = [u.lastName for u in esaf._users]
-            # print("Curret ESAF ", esaf.esaf_id, esaf.title, esaf.sector, start_time)
+            # print("Current ESAF ", esaf.esaf_id, esaf.title, esaf.sector, esaf.startDate)
+            for pr_prefix, pr_data in curr_props.items():
+                print(pr_prefix, pr_data)
+                if esaf_lnames[0] in pr_data[0]:
+                    # print("PREFIX  ", pr_prefix)
+                    prefix = pr_prefix
+            
+            print(" prefix ", prefix, esaf.esaf_id)
             caput(f"{prefix}esaf:id", "%d" % esaf.esaf_id)
             caput(f"{prefix}esaf:title",  esaf.title)            
             caput(f"{prefix}esaf:userBadges",  ', '.join(esaf_badges) )
