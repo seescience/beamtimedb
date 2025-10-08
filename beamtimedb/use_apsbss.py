@@ -143,7 +143,11 @@ def update_pvs(sector='13'):
         caput(f"{prefix}proposal:users", ', '.join(prop.lastNames))
         
     # print("Look for ESAFS " , sector)
-    # print("Current Proposals ", curr_props)
+    # print("Current Proposals: ")
+    # for _x, _k in curr_props.items():
+    #     print("   ", _x , _k[0])
+    # print("####")
+    
     for esaf in bss_server.current_esafs(sector):
         start_time = esaf.startDate.astimezone(tzone)
         end_time = esaf.endDate.astimezone(tzone)
@@ -151,14 +155,21 @@ def update_pvs(sector='13'):
             end_time-start_time < timedelta(days=50)):
             esaf_badges = [u.badge for u in esaf._users]
             esaf_lnames = [u.lastName for u in esaf._users]
-            # print("Current ESAF ", esaf.esaf_id, esaf.title, esaf.sector, esaf.startDate)
-            for pr_prefix, pr_data in curr_props.items():
-                print(pr_prefix, pr_data)
-                if esaf_lnames[0] in pr_data[0]:
-                    # print("PREFIX  ", pr_prefix)
-                    prefix = pr_prefix
+            # print("Current ESAF ", esaf.esaf_id, esaf.title, esaf.sector, esaf.startDate, esaf_lnames)
+            lname_score = {_x: 0 for _x in curr_props}
             
-            print(" prefix ", prefix, esaf.esaf_id)
+            for pr_prefix, pr_data in curr_props.items():
+                # print(' test ', pr_prefix, pr_data[0], esaf_lnames)
+                for elname in esaf_lnames:
+                    if elname in pr_data[0]:
+                        lname_score[pr_prefix] += 1
+            # print(f'{lname_score=}')
+            best_score, best_pref = 0, None
+            for pref, val in lname_score.items():
+                if val > best_score:
+                    best_score, prefix = val, pref
+           
+            # print("-->> prefix ", prefix, esaf.esaf_id)
             caput(f"{prefix}esaf:id", "%d" % esaf.esaf_id)
             caput(f"{prefix}esaf:title",  esaf.title)            
             caput(f"{prefix}esaf:userBadges",  ', '.join(esaf_badges) )
