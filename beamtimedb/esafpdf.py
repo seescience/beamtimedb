@@ -5,10 +5,54 @@ extract some information from text from ESAF PDF
 from glob import glob
 from pathlib import Path
 
-from pypdf import PdfReader
+from markitdown import MarkItDown
+
 from .beamtimedb import BeamtimeDB
 
-def read_esaf_header(filename):
+def read_esaf_header(fname):
+    md = MarkItDown()
+    result = md.convert(fname)
+    data =  {'printed_date': None,
+             'beamline': None,
+             'pen_line': None,
+             'pen_key': None,
+             'experiment_id': None,
+             'proposal_id': None,
+             'start_datetime': None,
+             'end_datetime': None,
+             'spokesperson': None,
+             'experiment_type': None}
+    
+    for line in result.text_content.split('\n'):
+        if line.startswith('Printed date:'):
+            data['printed_date'] = line.replace('Printed date:', '').strip()
+        elif line.startswith('ID Start Date:'):
+            data['start_datetime'] = line.replace('ID Start Date:', '').strip()
+        elif line.startswith('ID End Date:'):
+            data['end_datetime'] = line.replace('ID End Date:', '').strip()
+        elif line.startswith('BM Start Date:'):
+            data['start_datetime'] = line.replace('BM Start Date:', '').strip()
+        elif line.startswith('BM End Date:'):
+            data['end_datetime'] = line.replace('BM End Date:', '').strip()
+        elif line.startswith('Spokesperson:'):
+            data['spokesperson'] = line.replace('Spokesperson:', '').strip()
+        elif line.startswith('GUP ID:'):
+            data['proposal_id'] = line.replace('GUP ID:', '').strip()
+            
+        elif line.startswith('Experiment ID:'):
+            words = line.replace('Experiment ID:', '').strip().split()
+            data['experiment_id'] = words[0]
+            data['experiment_type'] = words[1].replace('(', '').replace(')', '')
+            
+        elif line.startswith('PEN:'):
+            data['pen_key'] = line.replace('PEN:', '').strip()
+            data['pen_line'] = line
+            words = data['pen_key'].split('-')
+            data['beamline'] = '-'.join(words[:2])
+    return data
+
+# from pypdf import PdfReader
+def read_esaf_header_pdfreader(filename):
     """return dictionary of data from the top of the 
     first page of an ESAF PDF
     """
