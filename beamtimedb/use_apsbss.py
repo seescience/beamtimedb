@@ -4,6 +4,7 @@ import logging
 from warnings import warn
 from datetime import datetime, timedelta
 from dateutil.parser import parse as dateparse
+from dateutil.tz import gettz
 from pytz import timezone
 
 from epics import get_pv, caput
@@ -11,10 +12,11 @@ from epics import get_pv, caput
 from .beamtimedb import BeamtimeDB
 
 try:
-    from apsbss.server_interface import Server as BSS_Server
+    # from apsbss.server_interface import Server as BSS_Server
+    from dm.aps_db_web_service.api.esafApsDbApi import EsafApsDbApi
+    from dm.aps_db_web_service.api.bssApsDbApi import BssApsDbApi
 except ImportError:
-    warn('need to import APSBSS Server to read APS BSS data')
-
+    warn('need to import dm.aps_db_web_service to read APS BSS data')
 
 BEAMLINES = {'13': {'13IDE:bss:': '13-ID-E',
                     '13IDCD:bss:': '13-ID-C,D',
@@ -22,91 +24,142 @@ BEAMLINES = {'13': {'13IDE:bss:': '13-ID-E',
                     '13BMC:bss:': '13-BM-C'}
              }
 
+TZ = gettz('America/Chicago')
+
+def get_current_esafs(bssapi, esafapi):
+    current_run = bssapi.getCurrentRun()
+    run = current_run['name']
+    year = run.split('-')[0]
+    out = []
+    run_start = dateparse(current_run['startTime']).astimezone(TZ)
+    run_end   = dateparse(current_run['endTime']).astimezone(TZ)
+    
+    year_esafs = esafapi.listStationEsafs('GSECARS', year=year)
+    for esaf in year_esafs:
+        start_date =  dateparse(esaf['experimentStartDate']).astimezone(TZ)
+        end_date =  dateparse(esaf['experimentEndDate']).astimezone(TZ)
+
+        if start_date > run_start and start_date < run_end:
+            out.append(esaf)
+    return out
+    
+
 def filldb_from_apsbss(sector='13', run=None):
     beamlines = BEAMLINES[sector]
 
     bt_db = BeamtimeDB()
     
-    dm_url = bt_db.get_info('DM_APS_DB_WEB_SERVICE_URL')
-    os.environ['DM_APS_DB_WEB_SERVICE_URL'] = dm_url
+    # dm_url = bt_db.get_info('DM_APS_DB_WEB_SERVICE_URL')
+    # os.environ['DM_APS_DB_WEB_SERVICE_URL'] = dm_url
     try:
-        bss_server = BSS_Server()
+        bssapi = BssApsDbApi()
     except:
-        raise ValueError(f'cannot connect to APSBSS Server with {dm_url=}')
+        raise ValueError(f'cannot connect to APSBSS Server')
+    try:
+        esafapi = EsafApsDbApi()
+    except:
+        raise ValueError(f'cannot connect to APSBSS Server')
 
     if run is None:
-        run = bss_server.current_run
+        run = bssapi.getCurrentRun()
     
-    current_esafs = bss_server.esafs(sector, run=run)
+    current_esafs = get_current_esafs(bssapi, esafapi) 
 
+    print("CURRENT ESAFS")
     for esaf in current_esafs:
-        # print('esaf ', esaf.esaf_id, esaf.title)
         user_ids = []
         spokesperson = None
-        for user in esaf._users:
-            d_user = bt_db.get_user(badge=user.badge)
+        for user in esaf['experimentUsers']:
+            d_user = bt_db.get_user(badge=user['badge'])
             if d_user is None:
-                d_user = bt_db.add_user(badge=int(user.badge), last_name=user.lastName,
-                                        first_name=user.firstName, email=user.email)
+                d_user = bt_db.add_user(badge=int(user['badge']),
+                                        last_name=user['lastName'],
+                                        first_name=user['firstName'],
+                                        email=user['email'])
             user_ids.append(d_user.id)
-            if user.is_pi:
+            if user['piFlag'] in ('Yes', True):
                 spokesperson = d_user.id
 
-        if  bt_db.get_experiment(esaf.esaf_id) is None:
-            bt_db.add_experiment(esaf.esaf_id, run=esaf.run, esaf_status=esaf.status,
-                                 start_date=esaf.startDate, end_date=esaf.endDate,
-                                 title=esaf.title, description=esaf.description,
-                                 spokesperson=spokesperson, users=user_ids)
+        if  bt_db.get_experiment(esaf['esafId']) is None:
+            print("Add ESAF: " , esaf['esafId'], esaf['esafTitle'])
 
+            start_date = dateparse(esaf['experimentStartDate']).astimezone(TZ)
+            end_date = dateparse(esaf['experimentEndDate']).astimezone(TZ)
+            
+            bt_db.add_experiment(esaf['esafId'], run=run['name'],
+                                 esaf_status=esaf['esafStatus'],
+                                 start_date=start_date,
+                                 end_date=end_date,
+                                 title=esaf['esafTitle'],
+                                 description=esaf['description'],
+                                 spokesperson=spokesperson,
+                                 users=user_ids)
+
+    print("- end esaf -------")
     # proposals
-    for prefix, beamline in beamlines.items():
-        for propid, prop in bss_server.current_proposals(beamline).items():
-            # print(f'proosal {prefix=}, {beamline=}, {propid=}') 
-            spokesperson = None
-            for user in prop.to_dict()['experimenters']:
-                badge = int(user['badge'])
-                affil = user['institution']
-                inst = bt_db.get_institution(name=affil)
-                if inst is None:
-                    inst = bt_db.add_institution(affil)
+    for prop in bssapi.listStationProposals('GSECARS', runName=run['name']):
+        spokesperson = None
+        for user in prop['experimenters']:
+            badge = int(user['badge'])
+            affil = user['institution']
+            inst = bt_db.get_institution(name=affil)
+            if inst is None:
+                inst = bt_db.add_institution(affil)
+            b_user = bt_db.get_user(badge=badge)
+            if b_user is None:
+                if 'email' not in user:
+                    user['email'] = 'unknown'
+                print("Add User ", user['email'])
+                b_user = bt_db.add_user(user['firstName'], user['lastName'],
+                                         user['email'], badge)
 
-                b_user = bt_db.get_user(badge=badge)
-                if b_user is None:
-                    if 'email' not in user:
-                        user['email'] = 'unknown'
-                    b_user = bt_db.add_user(user['firstName'], user['lastName'],
-                                            user['email'], badge)
+            bt_db.update('person', where={'badge': badge}, affiliation_id=inst.id)
+            if user['piFlag'] in (True, 'Y', 'y'):
+                spokesperson = b_user.id
 
-                bt_db.update('person', where={'badge': badge}, affiliation_id=inst.id)
-                if user['piFlag'] in (True, 'Y', 'y'):
-                    spokesperson = b_user.id
+        propid = prop['id']
+        title = prop['title']
+        if title.endswith('\n'):
+            title = title[:-1]
+        kws = {'title': title}
+        if spokesperson is not None:
+            kws['spokesperson_id'] = spokesperson
+        b_prop = bt_db.get_proposal(propid)
+        if b_prop is None:
+            print("Add Proposal ", propid, title, kws)
+            b_prop = bt_db.add_proposal(propid, **kws)
+            
 
-            title = prop.title
-            if title.endswith('\n'):
-                title = title[:-1]
-            kws = {'title': title}
-            if spokesperson is not None:
-                kws['spokesperson_id'] = spokesperson
-            b_prop = bt_db.get_proposal(propid)
-            if b_prop is None:
-                b_prop = bt_db.add_proposal(propid, **kws)
-                
-
-
-def update_pvs(sector='13'):
-    beamlines = BEAMLINES[sector]
+def update_pvs():
+    beamlines = BEAMLINES['13']
     bt_db = BeamtimeDB()
     
-    dm_url = bt_db.get_info('DM_APS_DB_WEB_SERVICE_URL')
-    os.environ['DM_APS_DB_WEB_SERVICE_URL'] = dm_url
-    try:
-        bss_server = BSS_Server()
-    except:
-        raise ValueError(f'cannot connect to APSBSS Server with {dm_url=}')
-    
-    tzone = timezone('America/Chicago')
-    cycle = bss_server.current_run
+    bssapi = BssApsDbApi()
+    current_run = bssapi.getCurrentRun()
+    run = current_run['name']
+    print("Run " , run)
 
+    run_id = int(bt_db.get_info('current_run_id'))
+    expt_list = bt_db.get_rows('experiment', where={'run_id': run_id})
+    print(f"See {len(expt_list)} for {run_id=}")
+    
+    current_time = datetime.now().astimezone(TZ)
+    current_expts = []
+    for expt in expt_list:
+        start_time = expt.start_date.astimezone(TZ)
+        end_time = expt.end_date.astimezone(TZ)
+        if start_time < current_time and current_time < end_time:
+            current_expts.append(expt)
+            
+    print("Current Experiments ", len(current_expts))
+
+    print("---")
+    for expt in current_expts:
+        print(expt.id, expt.beamline_id, expt.proposal_id, expt.start_date, expt.title)
+    return
+
+
+        
     for prefix, name in beamlines.items():
         get_pv(f"{prefix}proposal:beamline")
         get_pv(f"{prefix}esaf:cycle")
@@ -114,20 +167,22 @@ def update_pvs(sector='13'):
         esaf_pv = get_pv(f"{prefix}esaf:id")
 
         caput(f"{prefix}proposal:beamline", name)
-        caput(f"{prefix}esaf:cycle", cycle)
+        caput(f"{prefix}esaf:cycle", run)
 
-    current_time = datetime.now().astimezone(tzone)
-    curr_props = {}
+
+
+      
     prop_badges = {}
     for prefix, name in beamlines.items():
-        props = bss_server.current_proposals(name)
+        props = bssapi.listStationProposals('GSECARS', runName=run)
+        print("props " , props)
         # print(f"{prefix} {name} {len(props):d} proposals for this cycle")
         current_prop = None
-        for propid, prop in props.items():
-            start_time = prop.startDate.astimezone(tzone)
-            end_time = prop.endDate.astimezone(tzone)
+        for prop in props:
+            start_time = prop.startDate.astimezone(TZ)
+            end_time = prop.endDate.astimezone(TZ)
             if start_time < current_time and current_time < end_time:
-                current_prop = propid
+                current_prop = prop['     id']
                 # print(f" Current : {propid=}   {prefix=}, {name=}")
         if current_prop is None:
             current_prop = propid                
@@ -149,8 +204,8 @@ def update_pvs(sector='13'):
     # print("####")
     
     for esaf in bss_server.current_esafs(sector):
-        start_time = esaf.startDate.astimezone(tzone)
-        end_time = esaf.endDate.astimezone(tzone)
+        start_time = esaf.startDate.astimezone(TZ)
+        end_time = esaf.endDate.astimezone(TZ)
         if (start_time < current_time and current_time < end_time and
             end_time-start_time < timedelta(days=50)):
             esaf_badges = [u.badge for u in esaf._users]
