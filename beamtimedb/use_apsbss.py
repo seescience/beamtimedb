@@ -24,6 +24,11 @@ BEAMLINES = {'13': {'13IDE:bss:': '13-ID-E',
                     '13BMC:bss:': '13-BM-C'}
              }
 
+APSBSS_BEAMLINES = {1: ('13-BM-C', '13BMC:bss:'),
+                    2: ('13-BM-D', '13BMD:bss:'),
+                    3: ('13-ID-C,D', '13IDCD:bss:'),
+                    4: ('13-ID-E', '13IDE:bss:')}
+
 TZ = gettz('America/Chicago')
 
 def get_current_esafs(bssapi, esafapi):
@@ -65,7 +70,6 @@ def filldb_from_apsbss(sector='13', run=None):
     
     current_esafs = get_current_esafs(bssapi, esafapi) 
 
-    print("CURRENT ESAFS")
     for esaf in current_esafs:
         user_ids = []
         spokesperson = None
@@ -137,41 +141,89 @@ def update_pvs():
     bssapi = BssApsDbApi()
     current_run = bssapi.getCurrentRun()
     run = current_run['name']
-    print("Run " , run)
+    print("Updating PVs for Run " , run)
 
     run_id = int(bt_db.get_info('current_run_id'))
     expt_list = bt_db.get_rows('experiment', where={'run_id': run_id})
-    print(f"See {len(expt_list)} for {run_id=}")
-    
+
+    # complicated to find current esafs
     current_time = datetime.now().astimezone(TZ)
-    current_expts = []
+    maybe_current = {k: [] for k in APSBSS_BEAMLINES}
+
     for expt in expt_list:
         start_time = expt.start_date.astimezone(TZ)
         end_time = expt.end_date.astimezone(TZ)
-        if start_time < current_time and current_time < end_time:
-            current_expts.append(expt)
-            
-    print("Current Experiments ", len(current_expts))
+        bl_id = int(expt.beamline_id)
+        if bl_id > 0 and bl_id < 7:
+            if ((start_time > (current_time - timedelta(days=4))) and
+                (start_time < (current_time + timedelta(days=2))) and
+                (end_time   < (current_time + timedelta(days=10))) and
+                (end_time   > (current_time - timedelta(days=0.25)))):
+                maybe_current[bl_id].append(expt)
 
-    print("---")
-    for expt in current_expts:
-        print(expt.id, expt.beamline_id, expt.proposal_id, expt.start_date, expt.title)
-    return
+    for blid, elist in maybe_current.items():
+        for expt in elist:
+            user = bt_db.get_user(expt.spokesperson_id)
+            print(expt.id, expt.beamline_id, expt.proposal_id,
+                  expt.start_date, expt.end_date, expt.spokesperson_id,
+                  user.last_name, expt.title)
+                
+    current_esaf = {k: None for k in APSBSS_BEAMLINES}    
+    for blid, elist in maybe_current.items():
+        if len(elist) == 1:
+            current_esaf[blid] = elist[0]
+        elif len(elist) > 1:
+            for expt in elist:
+                start_time = expt.start_date.astimezone(TZ)
+                end_time = expt.end_date.astimezone(TZ)
+                if ((start_time < (current_time - timedelta(days=0.1))) and
+                    (end_time   > (current_time))):
+                    current_esaf[blid] = expt
+            if current_esaf[blid] is None:
+                ex0 = elist[0]
+                st0 = ex0.start_date.astimezone(TZ)
+                for expt in elist[1:]:
+                    start_time = expt.start_date.astimezone(TZ)
+                    if start_time < st0:
+                        ex0 = expt
+                        st0 = ex0.start_date.astimezone(TZ)
+                current_esaf[blid] = ex0
 
 
-        
-    for prefix, name in beamlines.items():
-        get_pv(f"{prefix}proposal:beamline")
-        get_pv(f"{prefix}esaf:cycle")
-        prop_pv = get_pv(f"{prefix}proposal:id")
-        esaf_pv = get_pv(f"{prefix}esaf:id")
-
-        caput(f"{prefix}proposal:beamline", name)
+    # Noe set PVs
+    for blid, expt in current_esaf.items():
+        blname, prefix = APSBSS_BEAMLINES[blid]
+        caput(f"{prefix}proposal:beamline", blname)        
         caput(f"{prefix}esaf:cycle", run)
+        if expt is not None:
+            user_badges = []
+            user_names = []
+            suser = bt_db.get_user(expt.spokesperson_id)
+            user_badges.append(f'{suser.badge}')
+            user_names.append(suser.last_name)
+            for userdat in bt_db.get_rows('experiment_person',
+                                         where={'experiment_id': expt.id}):
+                user = bt_db.get_user(userdat.person_id)
+                if user.badge not in user_badges:
+                    user_badges.append(f'{user.badge}')
+                if user.last_name not in user_names:
+                    user_names.append(user.last_name)
 
+            caput(f"{prefix}esaf:id", str(expt.id))
+            caput(f"{prefix}esaf:startDate", expt.start_date.isoformat(sep=' ', timespec='seconds'))
+            caput(f"{prefix}esaf:endDate", expt.end_date.isoformat(sep=' ', timespec='seconds'))
+            caput(f"{prefix}esaf:title",  expt.title)            
+            caput(f"{prefix}esaf:description",  expt.description)
+            caput(f"{prefix}esaf:userBadges",  ', '.join(user_badges) )
+            caput(f"{prefix}esaf:users",  ', '.join(user_names))
+            caput(f"{prefix}esaf:users_total",  len(user_names))
 
-
-      
+            prop = bt_db.get_proposal(expt.proposal_id)
+            caput(f"{prefix}proposal:title", prop.title)
+            caput(f"{prefix}proposal:id", str(expt.id))
+                                                                  
+            
+def old_pvput():      
     prop_badges = {}
     for prefix, name in beamlines.items():
         props = bssapi.listStationProposals('GSECARS', runName=run)
