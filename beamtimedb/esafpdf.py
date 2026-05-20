@@ -138,6 +138,7 @@ def match_beamline(blname):
 def read_esaf_pdfs(run=None):
     beamdb = get_beamline_names()
     esaf_folder = beamdb.get_info('esaf_pdf_folder')
+    print(f"ESAF FOLDER {esaf_folder=}")
     if run is None:
         run_id = beamdb.get_info('current_run_id')
         run_name = beamdb.get_rows('run', where={'id': int(run_id)},
@@ -156,7 +157,7 @@ def read_esaf_pdfs(run=None):
                 continue
                 
             data = read_esaf_header(pdffile)
-            # print("READ PDF ", pdffile, '\n', data)
+            print("READ PDF ", pdffile)
             if data['beamline'] is None:
                 continue
             bl_id = match_beamline(data['beamline'])
@@ -167,3 +168,35 @@ def read_esaf_pdfs(run=None):
                               run_id=run_id)
 
               
+
+def read_pending_pdfs(run=None):
+    beamdb = get_beamline_names()
+    esaf_folder = '/home/gse_admin/Pending_ESAFS'
+    print(f"ESAF FOLDER {esaf_folder=}")
+    if run is None:
+        run_id = beamdb.get_info('current_run_id')
+        run_name = beamdb.get_rows('run', where={'id': int(run_id)},
+                                   limit_one=True, none_if_empty=True)
+        run_name = run_name.name
+    else:
+        run_name = run
+        run = beamdb.get_rows('run', where={'name': run},
+                                   limit_one=True, none_if_empty=True)
+        run_id = run.id
+        
+    for pdffile in glob(esaf_folder + '/*'):
+        if not pdffile.endswith('.pdf'):
+            continue
+                
+        data = read_esaf_header(pdffile)
+        exptrow = beamdb.get_experiment(int(data['experiment_id']))
+        if exptrow.proposal_id is None:
+            bl_id = match_beamline(data['beamline'])
+            proprow = beamdb.get_row('proposal', where={'id': int(data['proposal_id'])})
+            if proprow is not None:
+                beamdb.update('experiment', where={'id': int(data['experiment_id'])},
+                              proposal_id=int(data['proposal_id']), beamline_id=bl_id,
+                              run_id=run_id)
+
+              
+                
