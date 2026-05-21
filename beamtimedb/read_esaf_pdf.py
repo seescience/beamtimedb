@@ -1,4 +1,6 @@
 """
+NOTE :: USE esafpdf !! 
+
 extract text from ESAF PDF
 
 Hopefully not needed for the long-term
@@ -12,8 +14,7 @@ ESAF_RUN = '2025-1'
 ESAF_FOLDER = '/cars5/Users/GSECARS/Beamtime/ESAFs/'
 ESAF_SUBFOLDERS = ('BMC', 'BMD',  'ID CD', 'IDE')
 
-
-def parse_esaf_header(filename):
+def OLD_parse_esaf_header(filename):
     """return dictionary of data from the top of the 
     first page of an ESAF PDF
     """
@@ -62,7 +63,7 @@ def parse_esaf_header(filename):
             
     return data
 
-def read_current_esafs(top='/cars5/Users/GSECARS/Beamtime/ESAFs/', run='2025-1'):
+def OLD_read_current_esafs(top='/cars5/Users/GSECARS/Beamtime/ESAFs/', run='2025-1'):
     beamdb = BeamtimeDB()
     for bname in ESAF_SUBFOLDERS:
         #ESAF_RUN = '2025-1'
