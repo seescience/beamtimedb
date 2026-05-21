@@ -38,6 +38,7 @@ def get_current_esafs(bssapi, esafapi):
     out = []
     run_start = dateparse(current_run['startTime']).astimezone(TZ)
     run_end   = dateparse(current_run['endTime']).astimezone(TZ)
+    print(f"BSS CURRENT {current_run=}")
     
     year_esafs = esafapi.listStationEsafs('GSECARS', year=year)
     for esaf in year_esafs:
@@ -69,8 +70,11 @@ def filldb_from_apsbss(sector='13', run=None):
         run = bssapi.getCurrentRun()
     
     current_esafs = get_current_esafs(bssapi, esafapi) 
-
+    print("Current ESAFS ", len(current_esafs))
     for esaf in current_esafs:
+        # print("ESAF ", esaf['esafId'], esaf['esafTitle'])
+        esaf_id = int(esaf['esafId'])
+        
         user_ids = []
         spokesperson = None
         for user in esaf['experimentUsers']:
@@ -84,21 +88,31 @@ def filldb_from_apsbss(sector='13', run=None):
             if user['piFlag'] in ('Yes', True):
                 spokesperson = d_user.id
 
-        if  bt_db.get_experiment(esaf['esafId']) is None:
-            print("Add ESAF: " , esaf['esafId'], esaf['esafTitle'])
+        if  bt_db.get_experiment(esaf_id) is None:
+            print("Add ESAF: " , esaf_id, esaf['esafTitle'])
 
             start_date = dateparse(esaf['experimentStartDate']).astimezone(TZ)
             end_date = dateparse(esaf['experimentEndDate']).astimezone(TZ)
+            aps_doi = esaf.get('doi', '')
             
-            bt_db.add_experiment(esaf['esafId'], run=run['name'],
+            bt_db.add_experiment(esaf_id, run=run['name'],
                                  esaf_status=esaf['esafStatus'],
                                  start_date=start_date,
                                  end_date=end_date,
                                  title=esaf['esafTitle'],
                                  description=esaf['description'],
                                  spokesperson=spokesperson,
+                                 aps_doi=aps_doi,
                                  users=user_ids)
-
+        aps_doi = esaf.get('doi', '')
+        if len(aps_doi) > 8:
+            expt = bt_db.get_experiment(esaf_id)
+            expt_aps_doi = str(expt.aps_doi)
+            if expt_aps_doi in (None, 'None', '') or len(expt_aps_doi)< 8:
+                print("Set DOI for experiment ", esaf_id, esaf['esafTitle'])
+                bt_db.update('experiment', where={'id': esaf_id},
+                             aps_doi=aps_doi)
+            
     print("- end esaf -------")
     # proposals
     for prop in bssapi.listStationProposals('GSECARS', runName=run['name']):
@@ -135,6 +149,7 @@ def filldb_from_apsbss(sector='13', run=None):
             
 
 def update_pvs():
+    print("updating PVs")
     beamlines = BEAMLINES['13']
     bt_db = BeamtimeDB()
     
