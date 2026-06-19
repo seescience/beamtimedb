@@ -243,7 +243,7 @@ class BeamtimeDB(SimpleDB):
                        spokesperson=None, beamline_contact=None,
                        users=None, title=None, description=None,
                        start_date=None, end_date=None,
-                       user_folder=None, data_doi=None,
+                       user_folder=None, data_doi=None, aps_doi=None,
                        pvlog_template_file=None, esaf_pdf_file=None,
                        proposal_pdf_file=None):
         
@@ -252,7 +252,7 @@ class BeamtimeDB(SimpleDB):
             raise ValueError(f"experiment {esaf_id} exists")
         print("add experiment....")
         sperson = self.get_user(id=spokesperson)
-
+        
         kws ={'id': esaf_id,
               'run_id': self._getid('run', run),
               'esaf_type_id':  self._getid('esaf_type', esaf_type),
@@ -265,6 +265,11 @@ class BeamtimeDB(SimpleDB):
               'start_date': start_date,
               'end_date': end_date,
               }
+        options = locals()
+        for key in ('user_folder', 'data_doi', 'aps_doi',
+                    'pvlog_template_file', 'esaf_pdf_file', 'proposal_pdf_file'):
+            if options[key] is not None:
+                kws[key] = options[key]
         
         self.add_row('experiment', **kws)
         exp_id = self.get_experiment(esaf_id).id
