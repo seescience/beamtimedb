@@ -173,9 +173,10 @@ def update_pvs():
             if ((start_time > (current_time - timedelta(days=4))) and
                 (start_time < (current_time + timedelta(days=2))) and
                 (end_time   < (current_time + timedelta(days=10))) and
-                (end_time   > (current_time - timedelta(days=0.25)))):
+                (end_time   > (current_time - timedelta(hours=4)))):
                 maybe_current[bl_id].append(expt)
 
+    print("# Proposals that may be Current:")                
     for blid, elist in maybe_current.items():
         for expt in elist:
             user = bt_db.get_user(expt.spokesperson_id)
@@ -191,9 +192,9 @@ def update_pvs():
             for expt in elist:
                 start_time = expt.start_date.astimezone(TZ)
                 end_time = expt.end_date.astimezone(TZ)
-                if ((start_time < (current_time - timedelta(days=0.1))) and
-                    (end_time   > (current_time))):
+                if ((start_time < (current_time+timedelta(hours=3))) and (end_time   > (current_time))):
                     current_esaf[blid] = expt
+                    print("Set current proposal ", blid, expt.proposal_id)                    
             if current_esaf[blid] is None:
                 ex0 = elist[0]
                 st0 = ex0.start_date.astimezone(TZ)
