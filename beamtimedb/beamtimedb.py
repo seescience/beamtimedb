@@ -88,6 +88,9 @@ class BeamtimeDB(SimpleDB):
         SimpleDB.__init__(self, dbname=self.dbname, server=self.server, **kws)
 
         self.beamline_names = {}
+        if 'apsbss_beamline' not in self.tables:
+            print(f"Warning: not connected to database {dbname=}, {server=}")
+            return
         for row in self.get_rows('apsbss_beamline'):
             if row.name is not None:
                 name = row.name.lower().replace('-', '').replace(',', '')
