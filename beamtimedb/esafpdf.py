@@ -6,7 +6,7 @@ from glob import glob
 from pathlib import Path
 
 from markitdown import MarkItDown
-
+from PyPDF2 import PdfReader
 from .beamtimedb import BeamtimeDB
 
 def read_esaf_header(fname):
@@ -16,8 +16,8 @@ def read_esaf_header(fname):
              'beamline': None,
              'pen_line': None,
              'pen_key': None,
-             'experiment_id': None,
-             'proposal_id': None,
+             'experiment_id': 0,
+             'proposal_id': 0,
              'start_datetime': None,
              'end_datetime': None,
              'spokesperson': None,
@@ -43,6 +43,10 @@ def read_esaf_header(fname):
             words = line.replace('Experiment ID:', '').strip().split()
             data['experiment_id'] = words[0]
             data['experiment_type'] = words[1].replace('(', '').replace(')', '')
+        elif line.startswith('ESAF ID:'):
+            words = line.replace('ESAF ID:', '').strip().split()
+            data['experiment_id'] = words[0]
+            data['experiment_type'] = words[1].replace('(', '').replace(')', '')
             
         elif line.startswith('PEN:'):
             data['pen_key'] = line.replace('PEN:', '').strip()
@@ -64,8 +68,8 @@ def read_esaf_header_pdfreader(filename):
              'beamline': None,
              'pen_line': None,
              'pen_key': None,
-             'experiment_id': None,
-             'proposal_id': None,
+             'experiment_id': 0,
+             'proposal_id': 0,
              'start_datetime': None,
              'end_datetime': None,
              'spokesperson': None,
@@ -154,18 +158,26 @@ def read_esaf_pdfs(run=None):
         folder = Path(esaf_folder, run_name, bname)
         for pdffile in glob(folder.as_posix() + '/*'):
             if not pdffile.endswith('.pdf'):
-                continue
-                
+                continue                
             data = read_esaf_header(pdffile)
             print("READ PDF ", pdffile)
             if data['beamline'] is None:
                 continue
             bl_id = match_beamline(data['beamline'])
-            proprow = beamdb.get_row('proposal', where={'id': int(data['proposal_id'])})
+            if data['proposal_id'] in (None, ''):
+                data['proposal_id'] = 0
+            try:
+                proprow = beamdb.get_row('proposal', where={'id': int(data['proposal_id'])})
+            except ValueError:
+                propros = None
             if proprow is not None:
-                beamdb.update('experiment', where={'id': int(data['experiment_id'])},
+                try:
+                    beamdb.update('experiment', where={'id': int(data['experiment_id'])},
                               proposal_id=int(data['proposal_id']), beamline_id=bl_id,
                               run_id=run_id)
+                except Exception:
+                    print("could not udpate experiment from PDF")
+                    pass
 
               
 
@@ -187,7 +199,7 @@ def read_pending_pdfs(run=None):
     for pdffile in glob(esaf_folder + '/*'):
         if not pdffile.endswith('.pdf'):
             continue
-                
+        print(pdffile)
         data = read_esaf_header(pdffile)
         exptrow = beamdb.get_experiment(int(data['experiment_id']))
         if exptrow.proposal_id is None:
