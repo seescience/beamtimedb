@@ -149,14 +149,13 @@ def filldb_from_apsbss(sector='13', run=None):
             
 
 def update_pvs():
-    print("updating PVs")
     beamlines = BEAMLINES['13']
     bt_db = BeamtimeDB()
     
     bssapi = BssApsDbApi()
     current_run = bssapi.getCurrentRun()
     run = current_run['name']
-    print("Updating PVs for Run " , run)
+    print(f"Updating PVs for {run=}")
 
     run_id = int(bt_db.get_info('current_run_id'))
     expt_list = bt_db.get_rows('experiment', where={'run_id': run_id})
@@ -176,13 +175,13 @@ def update_pvs():
                 (end_time   > (current_time - timedelta(hours=4)))):
                 maybe_current[bl_id].append(expt)
 
-    print("# Proposals that may be Current:")                
+    # print("# Proposals that may be Current:")                
     for blid, elist in maybe_current.items():
         for expt in elist:
             user = bt_db.get_user(expt.spokesperson_id)
-            print(expt.id, expt.beamline_id, expt.proposal_id,
-                  expt.start_date, expt.end_date, expt.spokesperson_id,
-                  user.last_name, expt.title)
+            #print(expt.id, expt.beamline_id, expt.proposal_id,
+            #      expt.start_date, expt.end_date, expt.spokesperson_id,
+            #      user.last_name, expt.title)
                 
     current_esaf = {k: None for k in APSBSS_BEAMLINES}    
     for blid, elist in maybe_current.items():
@@ -194,7 +193,7 @@ def update_pvs():
                 end_time = expt.end_date.astimezone(TZ)
                 if ((start_time < (current_time+timedelta(hours=3))) and (end_time   > (current_time))):
                     current_esaf[blid] = expt
-                    print("Set current proposal ", blid, expt.proposal_id)                    
+                    # print("Set current proposal ", blid, expt.proposal_id)                    
             if current_esaf[blid] is None:
                 ex0 = elist[0]
                 st0 = ex0.start_date.astimezone(TZ)
@@ -209,6 +208,7 @@ def update_pvs():
     # Noe set PVs
     for blid, expt in current_esaf.items():
         blname, prefix = APSBSS_BEAMLINES[blid]
+        print(f"# {blname}")
         caput(f"{prefix}proposal:beamline", blname)        
         caput(f"{prefix}esaf:cycle", run)
         if expt is not None:
@@ -224,7 +224,11 @@ def update_pvs():
                     user_badges.append(f'{user.badge}')
                 if user.last_name not in user_names:
                     user_names.append(user.last_name)
-
+            info = {'expt_id': str(expt.id),
+                    'title': expt.title,
+                    'start_time':  expt.start_date.isoformat(sep=' ',
+                                                             timespec='seconds'),
+                    'users': ', '.join(user_names)}
             caput(f"{prefix}esaf:id", str(expt.id))
             caput(f"{prefix}esaf:startDate", expt.start_date.isoformat(sep=' ', timespec='seconds'))
             caput(f"{prefix}esaf:endDate", expt.end_date.isoformat(sep=' ', timespec='seconds'))
@@ -237,7 +241,8 @@ def update_pvs():
             prop = bt_db.get_proposal(expt.proposal_id)
             caput(f"{prefix}proposal:title", prop.title)
             caput(f"{prefix}proposal:id", str(expt.id))
-                                                                  
+            for key, val in info.items():
+                print(f"   {key}: {val}")
             
 def old_pvput():      
     prop_badges = {}
