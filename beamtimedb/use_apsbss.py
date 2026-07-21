@@ -16,7 +16,7 @@ try:
     from dm.aps_db_web_service.api.esafApsDbApi import EsafApsDbApi
     from dm.aps_db_web_service.api.bssApsDbApi import BssApsDbApi
 except ImportError:
-    warn('need to import dm.aps_db_web_service to read APS BSS data')
+    warn('cannot import dm.aps_db_web_service to read APS BSS data')
 
 BEAMLINES = {'13': {'13IDE:bss:': '13-ID-E',
                     '13IDCD:bss:': '13-ID-C,D',
