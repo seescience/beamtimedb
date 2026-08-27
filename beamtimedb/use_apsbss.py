@@ -5,7 +5,6 @@ from warnings import warn
 from datetime import datetime, timedelta
 from dateutil.parser import parse as dateparse
 from dateutil.tz import gettz
-from pytz import timezone
 
 from epics import get_pv, caput
 
@@ -17,6 +16,7 @@ try:
     from dm.aps_db_web_service.api.bssApsDbApi import BssApsDbApi
 except ImportError:
     warn('cannot import dm.aps_db_web_service to read APS BSS data')
+
 
 BEAMLINES = {'13': {'13IDE:bss:': '13-ID-E',
                     '13IDCD:bss:': '13-ID-C,D',
@@ -31,45 +31,72 @@ APSBSS_BEAMLINES = {1: ('13-BM-C', '13BMC:bss:'),
 
 TZ = gettz('America/Chicago')
 
-def get_current_esafs(bssapi, esafapi):
-    current_run = bssapi.getCurrentRun()
-    run = current_run['name']
+BSS_RUNS = None
+bssapi = None 
+esafapi = None 
+
+def dtime(tstring):
+    return datetime.fromisoformat(tstring).astimezone(TZ)
+
+def get_current_run():
+    global BSS_RUNS, bssapi
+    if bssapi is None:
+        bssapi = BssApsDbApi()
+    if BSS_RUNS in (None, {}):
+        BSS_RUNS = {}
+        for rundat in bssapi.listRuns():
+            stime = rundat['startTime']
+            etime = rundat['endTime']
+            name = rundat['name']
+            BSS_RUNS[name] = (dtime(stime), dtime(etime))
+    
+    now = datetime.now().timestamp()
+    curr = None
+    for offset in (0, 30, 45, 60, 75, 90):
+        for name, tvals in BSS_RUNS.items():
+            if now > (tvals[0].timestamp()-offset*86400) and now < tvals[1].timestamp():
+                curr = name
+        if curr is not None:
+            break
+    return curr
+
+def get_current_esafs():
+    global bssapi, esafapi
+    if bssapi is None:
+        bssapi = BssApsDbApi()
+    if esafapi is None:
+        esafapi = EsafApsDbApi()        
+    run = get_current_run()
     year = run.split('-')[0]
     out = []
-    run_start = dateparse(current_run['startTime']).astimezone(TZ)
-    run_end   = dateparse(current_run['endTime']).astimezone(TZ)
-    print(f"BSS CURRENT {current_run=}")
+    run_start = BSS_RUNS[run][0]
+    run_end   = BSS_RUNS[run][1]
     
     year_esafs = esafapi.listStationEsafs('GSECARS', year=year)
     for esaf in year_esafs:
-        start_date =  dateparse(esaf['experimentStartDate']).astimezone(TZ)
-        end_date =  dateparse(esaf['experimentEndDate']).astimezone(TZ)
+        start_date =  dtime(esaf['experimentStartDate'])
+        end_date =  dtime(esaf['experimentEndDate'])
 
         if start_date > run_start and start_date < run_end:
             out.append(esaf)
     return out
     
-
+    
 def filldb_from_apsbss(sector='13', run=None):
     beamlines = BEAMLINES[sector]
 
     bt_db = BeamtimeDB()
-    
-    # dm_url = bt_db.get_info('DM_APS_DB_WEB_SERVICE_URL')
-    # os.environ['DM_APS_DB_WEB_SERVICE_URL'] = dm_url
-    try:
+  
+    global bssapi, esafapi
+    if bssapi is None:
         bssapi = BssApsDbApi()
-    except:
-        raise ValueError(f'cannot connect to APSBSS Server')
-    try:
-        esafapi = EsafApsDbApi()
-    except:
-        raise ValueError(f'cannot connect to APSBSS Server')
+    if esafapi is None:
+        esafapi = EsafApsDbApi()        
 
     if run is None:
-        run = bssapi.getCurrentRun()
+        run = get_current_run()
     
-    current_esafs = get_current_esafs(bssapi, esafapi) 
+    current_esafs = get_current_esafs() 
     print("Current ESAFS ", len(current_esafs))
     for esaf in current_esafs:
         # print("ESAF ", esaf['esafId'], esaf['esafTitle'])
@@ -91,11 +118,11 @@ def filldb_from_apsbss(sector='13', run=None):
         if  bt_db.get_experiment(esaf_id) is None:
             print("Add ESAF: " , esaf_id, esaf['esafTitle'])
 
-            start_date = dateparse(esaf['experimentStartDate']).astimezone(TZ)
-            end_date = dateparse(esaf['experimentEndDate']).astimezone(TZ)
+            start_date = dtime(esaf['experimentStartDate'])
+            end_date = dtime(esaf['experimentEndDate'])
             aps_doi = esaf.get('doi', '')
             
-            bt_db.add_experiment(esaf_id, run=run['name'],
+            bt_db.add_experiment(esaf_id, run=run,
                                  esaf_status=esaf['esafStatus'],
                                  start_date=start_date,
                                  end_date=end_date,
@@ -115,7 +142,7 @@ def filldb_from_apsbss(sector='13', run=None):
             
     print("- end esaf -------")
     # proposals
-    for prop in bssapi.listStationProposals('GSECARS', runName=run['name']):
+    for prop in bssapi.listStationProposals('GSECARS', runName=run):
         spokesperson = None
         for user in prop['experimenters']:
             badge = int(user['badge'])
@@ -152,9 +179,13 @@ def update_pvs():
     beamlines = BEAMLINES['13']
     bt_db = BeamtimeDB()
     
-    bssapi = BssApsDbApi()
-    current_run = bssapi.getCurrentRun()
-    run = current_run['name']
+    global bssapi, esafapi
+    if bssapi is None:
+        bssapi = BssApsDbApi()
+    if esafapi is None:
+        esafapi = EsafApsDbApi()        
+
+    run = get_current_run()
     print(f"Updating PVs for {run=}")
 
     run_id = int(bt_db.get_info('current_run_id'))
