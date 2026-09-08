@@ -68,8 +68,8 @@ def read_esaf_header_pdfreader(filename):
              'beamline': None,
              'pen_line': None,
              'pen_key': None,
-             'experiment_id': 0,
-             'proposal_id': 0,
+             'experiment_id': '0',
+             'proposal_id': '0',
              'start_datetime': None,
              'end_datetime': None,
              'spokesperson': None,
@@ -169,7 +169,8 @@ def read_esaf_pdfs(run=None):
             try:
                 proprow = beamdb.get_row('proposal', where={'id': int(data['proposal_id'])})
             except ValueError:
-                propros = None
+                proprow = None
+                data['proposal_id'] = 0                
             if proprow is not None:
                 try:
                     beamdb.update('experiment', where={'id': int(data['experiment_id'])},
@@ -183,7 +184,7 @@ def read_esaf_pdfs(run=None):
 
 def read_pending_pdfs(run=None):
     beamdb = get_beamline_names()
-    esaf_folder = '/home/gse_admin/Pending_ESAFS'
+    esaf_folder = '/home/detector/Pending_ESAFS'
     print(f"ESAF FOLDER {esaf_folder=}")
     if run is None:
         run_id = beamdb.get_info('current_run_id')
@@ -201,10 +202,18 @@ def read_pending_pdfs(run=None):
             continue
         print(pdffile)
         data = read_esaf_header(pdffile)
+        if data['proposal_id'] in (None, ''):
+            data['proposal_id'] = 0
+
         exptrow = beamdb.get_experiment(int(data['experiment_id']))
-        if exptrow.proposal_id is None:
+        if exptrow is not None and exptrow.proposal_id is None:
             bl_id = match_beamline(data['beamline'])
             proprow = beamdb.get_row('proposal', where={'id': int(data['proposal_id'])})
+            try:
+                proprow = beamdb.get_row('proposal', where={'id': int(data['proposal_id'])})
+            except ValueError:
+                proprow = None
+                data['proposal_id'] = 0                
             if proprow is not None:
                 beamdb.update('experiment', where={'id': int(data['experiment_id'])},
                               proposal_id=int(data['proposal_id']), beamline_id=bl_id,
