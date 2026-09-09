@@ -88,6 +88,7 @@ now = datetime.now()
 current_pids = {}
 experiments = bt_db.get_rows('experiment', run_id=int(curr_run), )
 pvlog_procs = bt_db.get_rows('pvlog_process')
+print(f'#{isotime()}: Check Current and Pending Experiments for pvlogger:')
 for expt in experiments:
     if (expt.folder is None or
         expt.start_date > (now + timedelta(days=8)) or
@@ -96,7 +97,7 @@ for expt in experiments:
     if expt.folder.startswith('/cars4'):
         chmod_cars4(expt.folder)
 
-    print(f"# Experiment {expt.id} {expt.folder} {expt.start_date}, {expt.end_date}")        
+    # print(f"# Experiment {expt.id} {expt.folder} {expt.start_date}, {expt.end_date}")
     if expt.pvlog_process_id in (0, '', None, 'None'):
         print(f"  start pvlog")
         proc = start_logging_process(expt.folder)
@@ -108,17 +109,21 @@ for expt in experiments:
         print(f"    check pvlog {expt.folder}")
         pvlog_row = bt_db.get_rows('pvlog_process', id=expt.pvlog_process_id, none_if_empty=True, limit_one=True)
         if pvlog_row is not None:
+            # default is no change to status
             pid = pvlog_row.pid
             pvlog_status = pvlog_row.status
+
             pvlog_folder_status = get_pvlog_folder_status(expt.folder)
             # print(f"        {pvlog_row.pid=}, {pvlog_row.status=} {pvlog_folder_status=}")
-            
+            if pvlog_folder_status == 'finished' and (now >  (expt.end_date + timedelta(hours=2))):
+                pvlog_status = 'finished'
             if expt.start_date < (now + timedelta(days=1)) and expt.end_date > (now - timedelta(minutes=1)): # should be running
                 running = False
                 if psutil.pid_exists(pvlog_row.pid):
                     cmdline = ' '.join(psutil.Process(pvlog_row.pid).cmdline())
                     if 'epicsapp' in cmdline and 'pvlogger' in cmdline and expt.folder in cmdline:
                         running = True
+                        pvlog_status = 'running'
                 if running:
                     print("    pvlogging appears to be running fine")
                 else:
@@ -134,7 +139,8 @@ for expt in experiments:
 
         else:
             pvlog_status = 'error'
-        bt_db.update('pvlog_process',  where={'pid': pid}, status=pvlog_status, heartbeat=datetime.now())
+        bt_db.update('pvlog_process',  where={'id': expt.pvlog_process_id},
+                     pid=pid, status=pvlog_status, heartbeat=datetime.now())
     
         current_pids[pid] = (expt.id, pvlog_status)
 
