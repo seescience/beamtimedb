@@ -292,3 +292,12 @@ class BeamtimeDB(SimpleDB):
             bid = self.beamline_names.get('unknown', None)
         return bid
 
+    def get_pvlogger_status(self, expt_id):
+        "return current PVlogger status for an expt_id"
+        erow = self.get_row('experiment',  where={'id': expt_id})
+        out = 'unknown'
+        if erow is not None:
+            pvlog_row = self.get_row('pvlog_process',  where={'id': expt.pvlog_process_id})
+            if pvlog_row is not None:
+                out = pvlog_row.status
+        return out
