@@ -12,6 +12,11 @@ dependencies = [
     "sqlalchemy_utils",
     "psycopg2",
     "markitdown[all]",
+    "fastapi>=0.162.5",
+    "pyyaml>=6.0.3",
+    "pypdf2>=3.0.1",
+    "uvicorn>=0.54.0",
+    "pydantic-settings>=2.11.0",
 ]
 
 requires-python = ">= 3.10"

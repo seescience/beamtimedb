@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 from socket import gethostname
 from datetime import datetime
+from sqlalchemy import Unicode
 import yaml
 from charset_normalizer import from_bytes
 
@@ -38,7 +39,7 @@ def get_credentials(envvar='BEAMTIMEDB_CREDENTIALS'):
 
 def json_encode(val):
     "simple wrapper around json.dumps"
-    if val is None or isinstance(val, (str, unicode)):
+    if val is None or isinstance(val, (str, Unicode)):
         return val
     return  json.dumps(val)
 
@@ -313,7 +314,7 @@ class BeamtimeDB(SimpleDB):
         erow = self.get_row('experiment',  where={'id': expt_id})
         out = 'unknown'
         if erow is not None:
-            pvlog_row = self.get_row('pvlog_process',  where={'id': expt.pvlog_process_id})
+            pvlog_row = self.get_row('pvlog_process',  where={'id': erow.pvlog_process_id})
             if pvlog_row is not None:
                 out = pvlog_row.status
         return out
